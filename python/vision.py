@@ -1,24 +1,49 @@
 # import the necessary packages
 from collections import deque
-from imutils.video import VideoStream
 import numpy as np
 import argparse
-from cv2 import cv2
-import imutils
+import cv2
 import time
+import imutils 
+from imutils.video import VideoStream
+
+def gstreamer_pipeline(
+    capture_width=1280,
+    capture_height=720,
+    display_width=1280,
+    display_height=720,
+    framerate=60,
+    flip_method=0,
+):
+    return (
+        "nvarguscamerasrc ! "
+        "video/x-raw(memory:NVMM), "
+        "width=(int)%d, height=(int)%d, "
+        "format=(string)NV12, framerate=(fraction)%d/1 ! "
+        "nvvidconv flip-method=%d ! "
+        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
+        "videoconvert ! "
+        "video/x-raw, format=(string)BGR ! appsink"
+        % (
+            capture_width,
+            capture_height,
+            framerate,
+            flip_method,
+            display_width,
+            display_height,
+        )
+    )
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
-ap.add_argument("-v", "--video",
-	help="path to the (optional) video file")
 ap.add_argument("-b", "--buffer", type=int, default=32,
 	help="max buffer size")
 args = vars(ap.parse_args())
 
 # define the lower and upper boundaries of the "green"
 # ball in the HSV color space
-greenLower = (190, 86, 6)
-greenUpper = (225, 255, 255)
+greenLower = (29, 86, 6)
+greenUpper = (64, 255, 255)
 
 # initialize the list of tracked points, the frame counter,
 # and the coordinate deltas
@@ -27,14 +52,7 @@ counter = 0
 (dX, dY) = (0, 0)
 direction = ""
 
-# if a video path was not supplied, grab the reference
-# to the webcam
-if not args.get("video", False):
-	vs = VideoStream(src=0).start()
-
-# otherwise, grab a reference to the video file
-else:
-	vs = cv2.VideoCapture(args["video"])
+vs = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
 
 # allow the camera or video file to warm up
 time.sleep(2.0)
@@ -45,7 +63,7 @@ while True:
 	frame = vs.read()
 	
     # handle the frame from VideoCapture or VideoStream
-	frame = frame[1] if args.get("video", False) else frame
+	frame = frame[1]
 	
     # if we are viewing a video and we did not grab a frame,
 	# then we have reached the end of the video
@@ -89,7 +107,8 @@ while True:
 			cv2.circle(frame, (int(x), int(y)), int(radius),
 				(0, 255, 255), 2)
 			cv2.circle(frame, center, 5, (0, 0, 255), -1)
-			pts.appendleft(center)
+	
+	pts.appendleft(center)
 
 	# loop over the set of tracked points
 	for i in np.arange(1, len(pts)):
@@ -98,53 +117,16 @@ while True:
 		if pts[i - 1] is None or pts[i] is None:
 			continue
 		
-        # check to see if enough points have been accumulated in
-		# the buffer
-		if counter >= 10 and i == 1 and pts[-10] is not None:
-			# compute the difference between the x and y
-			# coordinates and re-initialize the direction
-			# text variables
-			dX = pts[-10][0] - pts[i][0]
-			dY = pts[-10][1] - pts[i][1]
-			(dirX, dirY) = ("", "")
-			
-            # ensure there is significant movement in the
-			# x-direction
-			if np.abs(dX) > 20:
-				dirX = "East" if np.sign(dX) == 1 else "West"
-			
-            # ensure there is significant movement in the
-			# y-direction
-			if np.abs(dY) > 20:
-				dirY = "North" if np.sign(dY) == 1 else "South"
-			
-            # handle when both directions are non-empty
-			if dirX != "" and dirY != "":
-				direction = "{}-{}".format(dirY, dirX)
-			
-            # otherwise, only one direction is non-empty
-			else:
-				direction = dirX if dirX != "" else dirY    
-
-		# otherwise, compute the thickness of the line and
+        # otherwise, compute the thickness of the line and
 		# draw the connecting lines
 		thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
 		cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
 	
-    # show the movement deltas and the direction of movement on
-	# the frame
-	cv2.putText(frame, direction, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-		0.65, (0, 0, 255), 3)
-	cv2.putText(frame, "dx: {}, dy: {}".format(dX, dY),
-		(10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
-		0.35, (0, 0, 255), 1)
-	
-    # show the frame to our screen and increment the frame counter
+	# show the frame to our screen
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
-	counter += 1
 	
-    # if the 'q' key is pressed, stop the loop
+	# if the 'q' key is pressed, stop the loop
 	if key == ord("q"):
 		break
 
