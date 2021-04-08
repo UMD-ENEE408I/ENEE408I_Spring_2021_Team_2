@@ -101,7 +101,6 @@ with open('JEOPARDY_QUESTIONS1.json') as json_file:
             print("     say 'quit' to end game\n")
 
         elif selection == "quit":
-            #Negative amounts of money in Final Jeopardy?
             if total <= 0:
                 is_able_to_play_FINALJEOP = False
                 print('')
