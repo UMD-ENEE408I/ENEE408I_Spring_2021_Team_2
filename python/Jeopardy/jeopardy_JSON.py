@@ -22,6 +22,7 @@ with open('JEOPARDY_QUESTIONS1.json') as json_file:
     percent_correct = 0.0
     wager = 0
     is_over = False
+    is_able_to_play_FINALJEOP = True
     print("Say 'new' to begin new game.\n")
     while is_over == False:
         selection = input()
@@ -101,62 +102,66 @@ with open('JEOPARDY_QUESTIONS1.json') as json_file:
 
         elif selection == "quit":
             #Negative amounts of money in Final Jeopardy?
-            print("\nWelcome to Final Jeopardy, " + player_name + "!\n")
-            valid_question = False
-            while valid_question == False:
-                i = random.randint(0, 215000)
-                if data[i]['category'] is None or data[i]['value'] is None or data[i]['question'] is None:
-                    valid_question = False
-                elif 'http' in data[i]['question']:
-                    valid_question = False
-                elif '<' in data[i]['question']:
-                    valid_question = False
-                elif '/' in data[i]['question']:
-                    valid_question = False
-                elif 'seen here' in data[i]['question']:
-                    valid_question = False
-                else:
-                    question_value = (data[i]['value'])
-                    remove_chars = ["$", ","]
-                    for character in remove_chars:
-                        question_value = question_value.replace(character, "")
-                    question_value = int(question_value)
-                    if question_value < 2001:
-                        valid_question = False
-                    else: 
-                        valid_question = True
-                    
-
-            print('The Final Jeopardy Category is " ' + data[i]['category'] + ' "\n')
-            print('You have $' + str(total) + '. Wager any integer value between 0 and ' + str(total) + ' below:\n')
-            valid_wager = False
-            while valid_wager == False:
-                wager = input()
-                wager = int(wager)
-                if wager >= 0 and wager <= total:
-                    valid_wager = True
-                else:
-                    print('\nInvalid Wager. You have $' + str(total) + '. Wager any integer value between 0 and ' + str(total) + ' below:\n')
-
-            print('\nFor $' + str(wager) + ':\n')
-            print(data[i]['question'] + '\n')
-            correct_answer = data[i]['answer']
-            correct_answer_UPPER = correct_answer.upper()
-            correct_answer = correct_answer.replace("\\", "")
-            correct_answer = correct_answer.replace("the", "")
-            response = input()
-            response = response.upper()
-
-            if response in correct_answer_UPPER and len(response) >= 2:
-                total = total + wager
-                print('\nCorrect!\n')
-                num_correct += 1
+            if total <= 0:
+                is_able_to_play_FINALJEOP = False
+                print('')
             else:
-                total = total - wager
-                print('\nIncorrect. Correct Answer: What is ' + data[i]['answer'] + '?\n')
-                num_incorrect += 1
+                print("\nWelcome to Final Jeopardy, " + player_name + "!\n")
+                valid_question = False
+                while valid_question == False:
+                    i = random.randint(0, 215000)
+                    if data[i]['category'] is None or data[i]['value'] is None or data[i]['question'] is None:
+                        valid_question = False
+                    elif 'http' in data[i]['question']:
+                        valid_question = False
+                    elif '<' in data[i]['question']:
+                        valid_question = False
+                    elif '/' in data[i]['question']:
+                        valid_question = False
+                    elif 'seen here' in data[i]['question']:
+                        valid_question = False
+                    else:
+                        question_value = (data[i]['value'])
+                        remove_chars = ["$", ","]
+                        for character in remove_chars:
+                            question_value = question_value.replace(character, "")
+                        question_value = int(question_value)
+                        if question_value < 2001:
+                            valid_question = False
+                        else: 
+                            valid_question = True
+                        
 
-            print('\nGame Over.\n')
+                print('The Final Jeopardy Category is " ' + data[i]['category'] + ' "\n')
+                print('You have $' + str(total) + '. Wager any integer value between 0 and ' + str(total) + ' below:\n')
+                valid_wager = False
+                while valid_wager == False:
+                    wager = input()
+                    wager = int(wager)
+                    if wager >= 0 and wager <= total:
+                        valid_wager = True
+                    else:
+                        print('\nInvalid Wager. You have $' + str(total) + '. Wager any integer value between 0 and ' + str(total) + ' below:\n')
+
+                print('\nFor $' + str(wager) + ':\n')
+                print(data[i]['question'] + '\n')
+                correct_answer = data[i]['answer']
+                correct_answer_UPPER = correct_answer.upper()
+                correct_answer = correct_answer.replace("\\", "")
+                correct_answer = correct_answer.replace("the", "")
+                response = input()
+                response = response.upper()
+
+                if response in correct_answer_UPPER and len(response) >= 2:
+                    total = total + wager
+                    print('\nCorrect!\n')
+                    num_correct += 1
+                else:
+                    total = total - wager
+                    print('\nIncorrect. Correct Answer: What is ' + data[i]['answer'] + '?\n')
+                    num_incorrect += 1
+
+            print('Game Over.\n')
             print(player_name + ', you have won $' + str(total) + '!\n')
             print('Thanks for playing, ' + player_name + '!\n')
             is_over = True
