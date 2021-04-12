@@ -1,0 +1,14 @@
+{
+    "What is 17 + 5?": {
+        "answer": "22",
+        "points": 100
+    },
+    "What country are we in?": {
+        "answer": "USA",
+        "points": 2000
+    },
+    "Is this going to work?": {
+        "answer": "maybe",
+        "points": 200
+    }
+}
