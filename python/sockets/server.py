@@ -1,101 +1,118 @@
-#!/usr/bin/env python
-
-# WS server example that synchronizes state across clients
+#!/usr/bin/env python3
+# Below is based heavily on the examples in:
+# https://websockets.readthedocs.io/en/stable/intro.html
 
 import asyncio
 import json
-import logging
 import websockets
 import random
-
-logging.basicConfig()
-
-STATE = {"value": 0}
-SCORES = {}
-QUESTION = {"answer": "", "points": ""}
+import time
+import operator
 
 USERS = set()
+SCORE = {}
+CONTROL = {}
+QUESTION = {}
+BUZZED_DICT = {}
+ORDER_DICT = {}
+
+async def notify_users():
+    if USERS:  # asyncio.wait doesn't accept an empty list
+        message = json.dumps({"type": "users", "count": len(USERS)})
+        await asyncio.wait([user.send(message) for user in USERS])
 
 async def register(websocket):
+    print('REGISTER')
     USERS.add(websocket)
-    # get the users name - call for facial recognition?
-    name = await websocket.recv()
-    remote_ip =str(websocket.remote_address[0])
+    await notify_users()
+    if len(USERS) == 2:
+        await send_to_all(json.dumps({"type": "start"}))
 
-    # create entry for the new player in the current scores dictionary
-    SCORES[remote_ip] = {}
-    SCORES[remote_ip]['name'] = name
-    SCORES[remote_ip]['score'] = 0
-    print('registered')
-
-
-async def unregister(websocket):
-    # update the highscores/lifetime winnings JSON
-    USERS.remove(websocket)
-
-
-async def notify_score(websocket):
-    # look in the current scores dict for the score of the connection that is asking
-    remote_ip = str(websocket.remote_address[0])
-    score = SCORES[remote_ip]['score']
-    await websocket.send(score)
-
-
-async def notify_question():
+async def get_question(points):
     # load the questions json - maybe move this so the big json doesnt need to load every time
     questions_dict = json.load(open('questions.json'))
+    filtDict = {}
+    for key in questions_dict:
+        if questions_dict[key]['points'] == int(points):
+            filtDict[key] = {}
+            filtDict[key]['answer'] = questions_dict[key]['answer']
 
     # select a random entry in the json - Im not sure if the big one is organized differently
-    i = random.randint(0,len(questions_dict)-1)
-    q = list(questions_dict)[i]
+    i = random.randint(0,len(filtDict)-1)
+    q = list(filtDict)[i]
 
     # update the current question dictionary 
     # we need this to check the answer and update scores after a response is received
-    QUESTION['answer'] = questions_dict[q]['answer']
-    QUESTION['points'] = questions_dict[q]['points']
+    QUESTION['answer'] = filtDict[q]['answer']
+    QUESTION['points'] = int(points)
 
-    # send the question to all connections
-    await asyncio.wait([user.send(q) for user in USERS])
+    await send_to_all(json.dumps({"type": "question", "value": q}))
 
+async def send_to_all(msg):
+    await asyncio.wait([user.send(msg) for user in USERS])
 
-async def check_answer(websocket):
-    # get the answer from the connection that buzzed first (have not put buzzing in yet)
-    response = await websocket.recv()
-    
-    ip = websocket.remote_address[0]
-    # if the response matches the dictionary answer, tell the it is correct and add proper points,
-    # otherwise do the opposite
-    if response == QUESTION['answer']:
-        await websocket.send('correct')
-        SCORES[ip]['score'] = int(SCORES[ip]['score']) + int(QUESTION['points'])
+async def unregister(websocket):
+    print('UNREGISTER')
+    USERS.remove(websocket)
+    await notify_users()
+
+async def write_timestamp(name, buzz_tf):
+    BUZZED_DICT[name] = {}
+    if buzz_tf:
+        t = time.localtime()
+        float_time = t.tm_hour + t.tm_min/60 + t.tm_sec/3600
+        ORDER_DICT[name] = float_time
+
+async def prompt_first_buzzer():
+    first = min(ORDER_DICT.items(), key=operator.itemgetter(1))[0]
+    await send_to_all(json.dumps({"type": "prompt", "value": first}))
+
+async def check_answer(name, ans):
+    if ans == QUESTION['answer']:
+        print("CORRECT")
+        SCORE[name] = int(SCORE[name]) + int(QUESTION['points'])
+        CONTROL['value'] = name
     else:
-        await websocket.send('incorrect')
-        SCORES[ip]['score'] = int(SCORES[ip]['score']) - int(QUESTION['points'])
-    
-    # tell the player that answered their new score
-    await websocket.send(str(SCORES[ip]['score']))
+        print("INCORRECT")
+        SCORE[name] = int(SCORE[name]) - int(QUESTION['points'])
 
+    # await send_to_all({"type": "score", **SCORE})
+    print(SCORE)
+    BUZZED_DICT.clear()
+    ORDER_DICT.clear()
+    await send_to_all(json.dumps({"type": "control", **CONTROL}))
+    print('sent control')
 
-async def consumer(websocket, message):
-    # print(message)
-    # react to the messages from the client
-    if message == "score":
-        await notify_score(websocket)
-    elif message == 'question':
-        print('asking question')
-        await notify_question()
-    elif message == "answer":
-        await check_answer(websocket)
-
-async def consumer_handler(websocket, path):
-    # add the new connection to the list
+async def message_parse(websocket, path):
+    # register(websocket) sends user_event() to websocket
     await register(websocket)
-    print(USERS)
-    async for message in websocket:
-        await consumer(websocket, message)
+    try:
+        async for message in websocket:
+            message_dict = json.loads(message)
+            print(message_dict['type'])
+            if message_dict['type'] == 'name':
+                SCORE[message_dict['value']] = 0
+                if len(SCORE) == len(USERS):
+                    # Give initial control to the first person to submit their name
+                    CONTROL['value'] = list(SCORE)[0]
+                    await send_to_all(json.dumps({"type": "control", **CONTROL}))
+                print(SCORE)
+            elif message_dict['type'] == 'points':
+                await get_question(message_dict['value'])
+                print(QUESTION)
+                print(SCORE)
+            elif message_dict['type'] == 'buzz':
+                await write_timestamp(message_dict['name'], message_dict['value'])
+                if len(BUZZED_DICT) == len(USERS):
+                    await prompt_first_buzzer()
+            elif message_dict['type'] == 'answer':
+                await check_answer(message_dict['name'], message_dict['value'])
+                
+    finally:
+        await unregister(websocket)
 
 
-start_server = websockets.serve(consumer_handler, "localhost", 6789)
+start_server = websockets.serve(message_parse, '0.0.0.0', 5001)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

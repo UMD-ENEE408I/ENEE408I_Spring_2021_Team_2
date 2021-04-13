@@ -1,14 +1,27 @@
 {
-    "What is 17 + 5?": {
-        "answer": "22",
+    "What is 17 - 7? (in letters) ": {
+        "answer": "ten",
         "points": 100
     },
     "What country are we in?": {
         "answer": "USA",
-        "points": 2000
+        "points": 300
     },
     "Is this going to work?": {
         "answer": "maybe",
         "points": 200
+    },
+    "chelsea or porto?": {
+        "answer": "chelsea",
+        "points": 100
+    },
+    "what day is it?": {
+        "answer": "tuesday",
+        "points": 200
+    },
+    "favorite teacher?": {
+        "answer": "gil",
+        "points": 300
     }
+
 }
