@@ -21,6 +21,7 @@ async def notify_users():
         message = json.dumps({"type": "users", "count": len(USERS)})
         await asyncio.wait([user.send(message) for user in USERS])
 
+
 async def register(websocket):
     print('REGISTER')
     USERS.add(websocket)
@@ -28,9 +29,23 @@ async def register(websocket):
     if len(USERS) == 2:
         await send_to_all(json.dumps({"type": "start"}))
 
+
+async def send_to_all(msg):
+    await asyncio.wait([user.send(msg) for user in USERS])
+
+
+async def unregister(websocket):
+    print('UNREGISTER')
+    USERS.remove(websocket)
+    await notify_users()
+
+
 async def get_question(points):
     # load the questions json - maybe move this so the big json doesnt need to load every time
+    # this is my silly temporary one also
     questions_dict = json.load(open('questions.json'))
+
+    # filter out only questions with the proper point values
     filtDict = {}
     for key in questions_dict:
         if questions_dict[key]['points'] == int(points):
@@ -46,50 +61,61 @@ async def get_question(points):
     QUESTION['answer'] = filtDict[q]['answer']
     QUESTION['points'] = int(points)
 
+    # give all clients the question
     await send_to_all(json.dumps({"type": "question", "value": q}))
 
-async def send_to_all(msg):
-    await asyncio.wait([user.send(msg) for user in USERS])
-
-async def unregister(websocket):
-    print('UNREGISTER')
-    USERS.remove(websocket)
-    await notify_users()
 
 async def write_timestamp(name, buzz_tf):
+    # record each player that buzzes (passes also count)
     BUZZED_DICT[name] = {}
+
+    # only players that want to answer are added here
     if buzz_tf:
         t = time.localtime()
         float_time = t.tm_hour + t.tm_min/60 + t.tm_sec/3600
         ORDER_DICT[name] = float_time
 
+
 async def prompt_first_buzzer():
+    # ORDER_DICT has names as keys and timestamps as values
+    # the key with the smallest value is the player that buzzed first - prompt them for an answer
     first = min(ORDER_DICT.items(), key=operator.itemgetter(1))[0]
     await send_to_all(json.dumps({"type": "prompt", "value": first}))
 
+
 async def check_answer(name, ans):
     if ans == QUESTION['answer']:
+        # if the answer is correct - add points and give control to the person who answered
         print("CORRECT")
         SCORE[name] = int(SCORE[name]) + int(QUESTION['points'])
         CONTROL['value'] = name
     else:
+        # if the answer is incorrect - subtract points and leave control with whoever had it last
         print("INCORRECT")
         SCORE[name] = int(SCORE[name]) - int(QUESTION['points'])
 
-    # await send_to_all({"type": "score", **SCORE})
+    # trying to send the scores out here gave me errors - i dont think you can send 2 messages in a row
+    # await send_to_all({"type": "score", **SCORE}) 
     print(SCORE)
+
+    # clear these dicts for the next question
     BUZZED_DICT.clear()
     ORDER_DICT.clear()
-    await send_to_all(json.dumps({"type": "control", **CONTROL}))
-    print('sent control')
 
+    # tell the clients who has control
+    await send_to_all(json.dumps({"type": "control", **CONTROL}))
+
+# ----------- MAIN THING ----------- 
 async def message_parse(websocket, path):
     # register(websocket) sends user_event() to websocket
     await register(websocket)
     try:
         async for message in websocket:
+            # respond to the different types of messages that clients can send
             message_dict = json.loads(message)
             print(message_dict['type'])
+
+            # clients will send their name once the lobby is full
             if message_dict['type'] == 'name':
                 SCORE[message_dict['value']] = 0
                 if len(SCORE) == len(USERS):
@@ -97,16 +123,25 @@ async def message_parse(websocket, path):
                     CONTROL['value'] = list(SCORE)[0]
                     await send_to_all(json.dumps({"type": "control", **CONTROL}))
                 print(SCORE)
+
+            # the client in control of the game selects a point value for the next question
             elif message_dict['type'] == 'points':
                 await get_question(message_dict['value'])
                 print(QUESTION)
                 print(SCORE)
+
+            # clients all send a buzz-type message after viewing the question
+            # value is True if they wish to answer and False if they do not
             elif message_dict['type'] == 'buzz':
                 await write_timestamp(message_dict['name'], message_dict['value'])
                 if len(BUZZED_DICT) == len(USERS):
                     await prompt_first_buzzer()
+            
+            # the client that first buzzed will send and answer
+            # in this current state, they are the only one to attempt the question (right or wrong we will go to the next question)
             elif message_dict['type'] == 'answer':
                 await check_answer(message_dict['name'], message_dict['value'])
+                
                 
     finally:
         await unregister(websocket)
