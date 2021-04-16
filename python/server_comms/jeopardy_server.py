@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
-# Below is based heavily on the examples in:
-# https://websockets.readthedocs.io/en/stable/intro.html
-
+# Handles server and client interaction for the jeopardy game
+from jeopardy import Jeopardy
 import asyncio
 import json
 import websockets
+
 
 USERS = set()
 
@@ -38,9 +37,26 @@ async def one_to_all(websocket, path):
     finally:
         await unregister(websocket)
 
+##### Server Notes #####
+def ask_point_value(self, client_id):
+    # ask client for point value
+    # receive point value and set question_point_vlaue
+    return
+
+def ask_question(question_string, client_ids):
+    # send question to all 3 clients
+    pass
+
+def game_loop(game):
+    control_player = game.set_control_player()
+    game.question_point_value = ask_point_value()
+    # get quesrion and ask
+    # looks for first buzzage
+
 
 start_server = websockets.serve(one_to_all, '0.0.0.0', 5001)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
-
+game = Jeopardy()
+ 

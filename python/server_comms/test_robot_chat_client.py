@@ -1,8 +1,8 @@
 from robot_chat_client import RobotChatClient
 import time
 
-# server_ip = 'ws://localhost:5001'
-server_ip = 'ws://3.140.197.159:5001'
+server_ip = 'ws://localhost:5001'
+# server_ip = 'ws://3.140.197.159:5001'
 
 def test_callback(message_dict):
     print('Received dictionary {}'.format(message_dict))

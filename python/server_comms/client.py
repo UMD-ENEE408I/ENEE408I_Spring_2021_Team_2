@@ -5,6 +5,9 @@ from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
 import time
+from flask_ask import Ask, statement
+import string
+
 
 class Client(object):
     def __init__(self, url, timeout):
@@ -13,7 +16,7 @@ class Client(object):
         self.ioloop = IOLoop.instance()
         self.ws = None
         self.connect()
-        PeriodicCallback(self.keep_alive, 6000).start()
+        PeriodicCallback(self.keep_alive, 1000).start()
         self.ioloop.start()
 
     @gen.coroutine
@@ -36,6 +39,9 @@ class Client(object):
                 print("connection closed")
                 self.ws = None
                 break
+
+            if "SAY" in msg:
+                speech_text = msg.replace("SAY ", "")
 
     def keep_alive(self):
         if self.ws is None:

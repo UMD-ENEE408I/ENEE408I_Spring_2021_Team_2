@@ -35,24 +35,27 @@ class Application(tornado.web.Application):
 
 class MainHandler(tornado.websocket.WebSocketHandler):
     def __init__(self, *args, **kwargs):
+        self.num_clients = 0
         super(MainHandler, self).__init__(*args, **kwargs)
         self.jeopardyThread = Thread(2, "jeopardy", 2, start_jeopardy)
-
+        self.jeopardyThread.start()
 
     def check_origin(self, origin):
         return True
 
     def open(self):
+        self.num_clients = self.num_clients + 1
         logging.info("A client connected.")
 
     def on_close(self):
+        self.num_clients = self.num_clients - 1
         logging.info("A client disconnected")
 
     def on_message(self, message):
         logging.info("message: {}".format(message))
         # self.write_message("HI")
         if (message.lower() == "start jeopardy"):
-            self.jeopardyThread.start()
+            # self.jeopardyThread.start()
 
         if (message.lower() == "stop jeopardy"):
             if self.jeopardyThread.isAlive():
@@ -61,8 +64,16 @@ class MainHandler(tornado.websocket.WebSocketHandler):
             else:
                 print("Jeopardy thread does not exist")
             
+class JeopardyServer:
+    def __init__(self):
+        self.num_players = 0
+
+    def add_player()
+
 
 def start_jeopardy():
+    jeopardyServer = JeopardyServer()
+
     print("OMG WE ARE PLAYING JEOPARDY")
 
 def stop_jeopardy():
@@ -75,8 +86,8 @@ def main():
     tornado.ioloop.IOLoop.instance().start()
 
 
-if __name__ == "__main__":
-    # mainThread = Thread(1, "main", 1, main)
-    # mainThread.start()
-    main()
+# if __name__ == "__main__":
+#     # mainThread = Thread(1, "main", 1, main)
+#     # mainThread.start()
+#     main()
 
