@@ -12,9 +12,11 @@ import operator
 USERS = set()
 SCORE = {}
 CONTROL = {}
-QUESTION = {}
 BUZZED_DICT = {}
 ORDER_DICT = {}
+QUESTION = {}
+with open('/home/evan/ENEE408I_Spring_2021_Team_2/python/sockets/jp_questions.json') as questions_file:
+    jeopardy_dict = json.load(questions_file)
 
 async def notify_users():
     if USERS:  # asyncio.wait doesn't accept an empty list
@@ -41,28 +43,18 @@ async def unregister(websocket):
 
 
 async def get_question(points):
-    # load the questions json - maybe move this so the big json doesnt need to load every time
-    # this is my silly temporary one also
-    questions_dict = json.load(open('questions.json'))
-
-    # filter out only questions with the proper point values
-    filtDict = {}
-    for key in questions_dict:
-        if questions_dict[key]['points'] == int(points):
-            filtDict[key] = {}
-            filtDict[key]['answer'] = questions_dict[key]['answer']
-
-    # select a random entry in the json - Im not sure if the big one is organized differently
-    i = random.randint(0,len(filtDict)-1)
-    q = list(filtDict)[i]
-
-    # update the current question dictionary 
-    # we need this to check the answer and update scores after a response is received
-    QUESTION['answer'] = filtDict[q]['answer']
-    QUESTION['points'] = int(points)
+    # find question with the proper point value, if not found keep looping
+    while True:
+        i = str(random.randint(0,len(jeopardy_dict)-1))
+        if jeopardy_dict[i]["value"] == points:
+            QUESTION['question'] = jeopardy_dict[i]['question']
+            QUESTION['answer'] = jeopardy_dict[i]['answer']
+            QUESTION['category'] = jeopardy_dict[i]['category']
+            QUESTION['value'] = jeopardy_dict[i]['value']
+            break
 
     # give all clients the question
-    await send_to_all(json.dumps({"type": "question", "value": q}))
+    await send_to_all(json.dumps({"type": "question", "q_info": QUESTION}))
 
 
 async def write_timestamp(name, buzz_tf):
@@ -76,7 +68,7 @@ async def write_timestamp(name, buzz_tf):
         ORDER_DICT[name] = float_time
 
 
-async def prompt_first_buzzer():
+async def prompt_buzzer():
     # ORDER_DICT has names as keys and timestamps as values
     # the key with the smallest value is the player that buzzed first - prompt them for an answer
     first = min(ORDER_DICT.items(), key=operator.itemgetter(1))[0]
@@ -84,26 +76,46 @@ async def prompt_first_buzzer():
 
 
 async def check_answer(name, ans):
+
+    ans = ans.lower()
+    replace_words = ["who is", "what is", "where is", " the ", " a "]
+    for word in replace_words:
+        ans = ans.replace(word, "")
+    print(ans)
+    print(QUESTION)
+    # NOT COMMUNICATING QUESTIOn
+    print(QUESTION['answer'])
     if ans == QUESTION['answer']:
         # if the answer is correct - add points and give control to the person who answered
         print("CORRECT")
-        SCORE[name] = int(SCORE[name]) + int(QUESTION['points'])
+        SCORE[name] = int(SCORE[name]) + int(QUESTION['value'])
         CONTROL['value'] = name
+        # clear these dicts for the next question
+        BUZZED_DICT.clear()
+        ORDER_DICT.clear()
+        QUESTION.clear()
+        print(SCORE)
+        # tell the clients who has control
+        await send_to_all(json.dumps({"type": "control", **CONTROL}))
     else:
         # if the answer is incorrect - subtract points and leave control with whoever had it last
         print("INCORRECT")
-        SCORE[name] = int(SCORE[name]) - int(QUESTION['points'])
-
+        SCORE[name] = int(SCORE[name]) - int(QUESTION['value'])
+        # remove name from buzzed and order dictionaties
+        BUZZED_DICT.pop(name)
+        ORDER_DICT.pop(name)
+        print(SCORE)
+        if ORDER_DICT == {}:
+            # tell the clients who has control
+            await send_to_all(json.dumps({"type": "control", **CONTROL}))
+        else:
+            await prompt_buzzer()
+            
     # trying to send the scores out here gave me errors - i dont think you can send 2 messages in a row
     # await send_to_all({"type": "score", **SCORE}) 
-    print(SCORE)
+    
 
-    # clear these dicts for the next question
-    BUZZED_DICT.clear()
-    ORDER_DICT.clear()
-
-    # tell the clients who has control
-    await send_to_all(json.dumps({"type": "control", **CONTROL}))
+    
 
 # ----------- MAIN THING ----------- 
 async def message_parse(websocket, path):
@@ -135,7 +147,7 @@ async def message_parse(websocket, path):
             elif message_dict['type'] == 'buzz':
                 await write_timestamp(message_dict['name'], message_dict['value'])
                 if len(BUZZED_DICT) == len(USERS):
-                    await prompt_first_buzzer()
+                    await prompt_buzzer()
             
             # the client that first buzzed will send and answer
             # in this current state, they are the only one to attempt the question (right or wrong we will go to the next question)

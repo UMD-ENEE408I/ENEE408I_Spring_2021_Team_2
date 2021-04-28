@@ -1,7 +1,20 @@
 from robot_chat_client import RobotChatClient
 import time
+from gtts import gTTS
+from playsound import playsound
+import os
+import speech_recognition as sr
+import pyaudio
+
+
 
 name = ""
+
+def speak(statement):
+    gts = gTTS(text=statement,lang='en')
+    gts.save("audio.mp3")
+    playsound("audio.mp3")
+    os.remove("audio.mp3")
 
 def test_callback(message_dict):
     global name 
@@ -26,9 +39,22 @@ def test_callback(message_dict):
 
     # question is sent to each player, everyone must respond yes/no to continue
     if message_dict['type'] == 'question':
-        print(message_dict['value'])
-        buzz = input("Do you wish to answer? (y/n) ")
-        buzz_bool = (buzz == 'y')
+        q_info = message_dict['q_info']
+        # print(message_dict['q_info'])
+        state_category = "The category is " + q_info["category"].lower() + "."
+        speak(state_category)
+        state_value = "The question is worth " + q_info["value"] + " points."
+        speak(state_value)
+        state_question = q_info['question']
+        speak(state_question)
+        # print(state_question)
+        # wait for buzz or pass
+        speak("buzz or pass.")
+        with sr.Microphone(device_index=mic_device_index) as source:
+            print("Say something!")
+            audio = r.listen(source)
+            
+        buzz_bool = ( r.recognize_google(audio).lower() == 'buzz')
         client.send({'type': 'buzz',
                     'value': buzz_bool,
                     'name': name})
@@ -51,8 +77,19 @@ def test_callback(message_dict):
 # Run this script directly to invoke this test sequence
 if __name__ == '__main__':
     print('Creating RobotChatClient object')
-    client = RobotChatClient('ws://localhost:5001', callback=test_callback)
+    global r
+    global p
+    global mic_device_index
+    r = sr.Recognizer()
+    p = pyaudio.PyAudio()
+    for ii in range(p.get_device_count()):
+        if "USB PnP Sound Device" in p.get_device_info_by_index(ii).get("name") :
+            mic_device_index = ii
+            break
 
+    client = RobotChatClient('ws://localhost:5001', callback=test_callback)
+    # obtain audio from the microphone
+    
     time.sleep(0.5)
     
 
