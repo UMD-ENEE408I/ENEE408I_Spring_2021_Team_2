@@ -2,7 +2,7 @@ from flask import Flask
 from flask_ask import Ask, statement, question, convert_errors
 import os
 from chess_thread import ChessThread
-from chess_vision import ChessCamera
+from chess_functions import *
 
 app = Flask(__name__)
 ask = Ask(app, '/')
@@ -21,7 +21,6 @@ def play_chess():
 def set_level(level):
     if 'level' in convert_errors:
         return question("Can you please repeat the level?")
-    print(level)
     global chess_inst
     chess_inst.set_level(level)
     text = "What color would you like to play as?"
