@@ -12,12 +12,40 @@ import json
 name = ""
 
 def speak(statement):
-    # gts = gTTS(text=statement,lang='en')
-    # gts.save("audio.mp3")
-    # playsound("audio.mp3")
-    # os.remove("audio.mp3")
+    gts = gTTS(text=statement,lang='en')
+    gts.save("audio.mp3")
+    playsound("audio.mp3")
+    os.remove("audio.mp3")
     print(statement)
 
+def get_audio(default="unknown"):
+    global r
+    global mic_device_index
+
+    with sr.Microphone(device_index=mic_device_index) as source:
+        audio = r.listen(source)
+        try:
+            string = r.recognize_google(audio)
+        except:
+            speak("I didn't understand that, could you repeat?")
+            audio = r.listen(source)
+            try:
+                string = r.recognize_google(audio)
+            except:
+                speak("I didn't understand that again, giving default value")
+                return default
+
+    return string
+
+def get_response(response_list=[]):
+    response = ""
+    if response_list != []:
+        string = get_audio(default=response_list[0])
+        if string not in response_list:
+            string = response_list[0]
+    else:
+        string = get_audio()
+    return string.lower()
 
 def test_callback(message_dict):
     global name
@@ -30,10 +58,10 @@ def test_callback(message_dict):
 
     # start type message is sent when lobby size is met - user is prompted for name
     if message_dict['type'] == 'start':
-        # with sr.Microphone(device_index=mic_device_index) as source:
-            #    name = r.listen(source)
-        name = input("What is your name? ")
-        print('Sending your name to the server')
+        speak("what is your name?")
+        name = get_response()
+        # name = input("What is your name? ")
+        print('Sending your name to the server, ' + name)
         client.send({'type': 'name',
                     'value': name})
         pingThread.set_name(name)
@@ -53,9 +81,9 @@ def test_callback(message_dict):
 
         if message_dict['control info']['value'] == name:
             speak("Select a point value.")
-            # with sr.Microphone(device_index=mic_device_index) as source:
-            #     points = r.listen(source)
-            points = input("What points? (100, 200, 300) ")
+            response_list = ['100', '200', '300', '400', '500']
+            points = get_response(response_list=response_list)
+            # points = input("What points? (100, 200, 300) ")
             client.send({'type': 'points',
                     'value': points})
 
@@ -75,13 +103,12 @@ def test_callback(message_dict):
         
         # wait for buzz or pass
         speak("buzz or pass.")
-        
-        # with sr.Microphone(device_index=mic_device_index) as source:
-        #     audio = self.r.listen(source)
-        # buzz_bool = ( self.r.recognize_google(audio).lower() == 'buzz')
+        response_list =  ['pass', 'buzz']
+        buzz = get_response(response_list=response_list)
+        buzz_bool = ( buzz == 'buzz')
 
-        audio = input()
-        buzz_bool = (audio.lower() == 'buzz')
+        # audio = input()
+        # buzz_bool = (audio.lower() == 'buzz')
         client.send({'type': 'buzz',
                     'value': buzz_bool,
                     'name': name})
@@ -90,9 +117,8 @@ def test_callback(message_dict):
     if message_dict['type'] == 'prompt':
         if message_dict['value'] == name:
             speak("You buzzed first, what is your answer?")
-            # with sr.Microphone(device_index=mic_device_index) as source:
-            #     ans = self.r.listen(source)
-            ans = input()
+            ans = get_response()
+            # ans = input()
             client.send({'type': 'answer',
                         'value': ans,
                         'name': name})
@@ -136,8 +162,8 @@ if __name__ == '__main__':
             mic_device_index = ii
             break
 
-    # server_ip = "ws://3.128.26.29:5001"
-    server_ip = 'ws://localhost:5001'
+    server_ip = "ws://3.128.26.29:5001"
+    # server_ip = 'ws://localhost:5001'
     client = RobotChatClient(server_ip, callback=test_callback)
     pingThread = PingThread(client)
 
