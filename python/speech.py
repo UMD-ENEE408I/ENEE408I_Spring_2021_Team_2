@@ -3,10 +3,16 @@
 # NOTE: this example requires PyAudio because it uses the Microphone class
 
 import speech_recognition as sr
-
+import pyaudio
 # obtain audio from the microphone
 r = sr.Recognizer()
-with sr.Microphone() as source:
+p = pyaudio.PyAudio()
+for ii in range(p.get_device_count()):
+    if "USB PnP Sound Device" in p.get_device_info_by_index(ii).get("name") :
+        mic_device_index = ii
+        break
+
+with sr.Microphone(device_index=mic_device_index) as source:
     print("Say something!")
     audio = r.listen(source)
 

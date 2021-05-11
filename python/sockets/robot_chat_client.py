@@ -10,9 +10,11 @@ import queue
 # A simple object for communicating with a websocket server
 class RobotChatClient(object):
     def __init__(self, uri, callback):
+
+        
         self.uri = uri
         self.callback = callback
-
+        self.running = True
         self.send_message_dict_queue = asyncio.Queue()
         self.event_loop = asyncio.new_event_loop()
         self.websocket = None
@@ -20,6 +22,8 @@ class RobotChatClient(object):
         self.thread = threading.Thread(target=self.send_receive_thread,
                                        args=[self.event_loop,])
         self.thread.start()
+
+        
 
         # Hack to wait for the websocket to be created
         while self.websocket is None:
@@ -55,3 +59,4 @@ class RobotChatClient(object):
     # Encode a python dictionary into a string and send it with a websocket
     def send(self, message_dict):
         asyncio.run_coroutine_threadsafe(self._send_coroutine(message_dict), self.event_loop)
+
